@@ -333,6 +333,7 @@ Konfigurasi dilakukan untuk setiap DHCP relay. Contoh hasil DHCP adalah sebagai 
 
 ![schwer mountain ip](https://github.com/aryansfw/Jarkom-Modul-5-B18-2023/assets/115603634/73cac070-ffaf-435a-a876-466658c05604)
 
+
 ## **Soal Nomor 1**
 Agar topologi yang kalian buat dapat mengakses keluar, kalian diminta untuk mengkonfigurasi Aura menggunakan iptables, tetapi tidak ingin menggunakan MASQUERADE.
 
@@ -368,25 +369,173 @@ Selain itu, akses menuju WebServer hanya diperbolehkan saat jam kerja yaitu Seni
 Lalu, karena ternyata terdapat beberapa waktu di mana network administrator dari WebServer tidak bisa stand by, sehingga perlu ditambahkan rule bahwa akses pada hari Senin - Kamis pada jam 12.00 - 13.00 dilarang (istirahat maksi cuy) dan akses di hari Jumat pada jam 11.00 - 13.00 juga dilarang (maklum, Jumatan rek).
 
 ### **Penyelesaian Nomor 6**
+Pada Web Server (Sein dan Stark) jalankan syntax berikut.
+
+```sh
+iptables -A INPUT -m time --timestart 12:00 --timestop 13:00 --weekdays Mon,Tue,Wed,Thu -j REJECT
+
+iptables -A INPUT -m time --timestart 11:00 --timestop 13:00 --weekdays Fri -j REJECT
+```
+
+**Testing**
+- Jam Kerja
+```sh
+date -u 1218140023
+
+# Web server
+nc -l -p 200
+
+# Client
+nc 192.187.4.2 200
+```
+![image](https://github.com/aryansfw/Jarkom-Modul-5-B18-2023/assets/114483889/bdd83e26-bdcf-4784-9474-7e34eed48ebb)
+
+- Jam Istirahat
+```sh
+date -u 1222120023
+
+# Web server
+nc -l -p 200
+
+# Client
+nc 192.187.4.2 200
+```
+![image](https://github.com/aryansfw/Jarkom-Modul-5-B18-2023/assets/114483889/9f1e1fcc-8204-4dc3-a3ac-f0e790a8ae61)
 
 
 ## **Soal Nomor 7**
 Karena terdapat 2 WebServer, kalian diminta agar setiap client yang mengakses Sein dengan Port 80 akan didistribusikan secara bergantian pada Sein dan Stark secara berurutan dan request dari client yang mengakses Stark dengan port 443 akan didistribusikan secara bergantian pada Sein dan Stark secara berurutan.
 
 ### **Penyelesaian Nomor 7**
+Syntax berikut akan dijalankan pda router yang terhubung dengan Web Server.
 
+```sh
+iptables -A PREROUTING -t nat -p tcp --dport 80 -d 192.187.4.2 -m statistic --mode nth --every 2 --packet 0 -j DNAT --to-destination 192.187.4.2
+
+iptables -A PREROUTING -t nat -p tcp --dport 80 -d 192.187.4.2 -j DNAT --to-destination 192.187.0.18
+
+iptables -A PREROUTING -t nat -p tcp --dport 443 -d 192.187.0.18 -m statistic --mode nth --every 2 --packet 0 -j DNAT --to-destination 192.187.0.18
+
+iptables -A PREROUTING -t nat -p tcp --dport 443 -d 192.187.0.18 -j DNAT --to-destination 192.187.4.2
+
+```
+**Testing**
+
+Buka koneksi pada webserver yaitu sein dan stark dengan syntax berikut untuk port 80
+
+`while true; do nc -l -p 80 -c 'echo "This is Sein"'; done
+`
+
+`while true; do nc -l -p 80 -c 'echo "This is Stark"'; done
+`
+
+![image](https://github.com/aryansfw/Jarkom-Modul-5-B18-2023/assets/114483889/0e0b1bf4-a498-4f17-b91a-cd91deeee428)
+
+dan syntax berikut untuk port 443
+
+`while true; do nc -l -p 443 -c 'echo "This is Sein"'; done
+`
+
+`while true; do nc -l -p 443 -c 'echo "This is Stark"'; done
+`
+
+![image](https://github.com/aryansfw/Jarkom-Modul-5-B18-2023/assets/114483889/c9b1de09-9149-46fd-b486-90634570df45)
 
 ## **Soal Nomor 8**
 Karena berbeda koalisi politik, maka subnet dengan masyarakat yang berada pada Revolte dilarang keras mengakses WebServer hingga masa pencoblosan pemilu kepala suku 2024 berakhir. Masa pemilu (hingga pemungutan dan penghitungan suara selesai) kepala suku bersamaan dengan masa pemilu Presiden dan Wakil Presiden Indonesia 2024.
 
 ### **Penyelesaian Nomor 8**
 
+Pada Web Server (Sein dan Stark) jalankan syntax berikut.
+```sh
+iptables -A INPUT -p tcp --dport 80 -s 192.187.0.30/30 -m time --datestart 2023-12-10 --datestop 2024-02-15 -j DROP
+```
+
+**Testing**
+```sh
+date -u 1219170023
+
+# Web server
+nc -l -p 80
+
+# Client
+nmap 192.187.4.2 80
+```
+
+![image](https://github.com/aryansfw/Jarkom-Modul-5-B18-2023/assets/114483889/6b44f1e2-e7df-4fae-a27a-1409d19c0526)
+
+
 ## **Soal Nomor 9**
 Sadar akan adanya potensial saling serang antar kubu politik, maka WebServer harus dapat secara otomatis memblokir  alamat IP yang melakukan scanning port dalam jumlah banyak (maksimal 20 scan port) di dalam selang waktu 10 menit (clue: test dengan nmap).
 
 ### **Penyelesaian Nomor 9**
 
+Pada Web Server (Sein dan Stark) jalankan syntax berikut.
+```sh
+iptables -N portscan
+
+iptables -A INPUT -m recent --name portscan --update --seconds 600 --hitcount 20 -j DROP
+iptables -A FORWARD -m recent --name portscan --update --seconds 600 --hitcount 20 -j DROP
+
+iptables -A INPUT -m recent --name portscan --set -j ACCEPT
+iptables -A FORWARD -m recent --name portscan --set -j ACCEPT
+
+```
+
+**Testing**
+
+Ketika di ping, paket yang diterima hanya 20 paket saja. Selebihnya akan di `DROP`
+
+![image](https://github.com/aryansfw/Jarkom-Modul-5-B18-2023/assets/114483889/24bd9bf0-269e-4979-8467-23c5bfa3835d)
+
 ## **Soal Nomor 10**
 Karena kepala suku ingin tau paket apa saja yang di-drop, maka di setiap node server dan router ditambahkan logging paket yang di-drop dengan standard syslog level. 
 
 ### **Penyelesaian Soal Nomor 10**
+Untuk dapat melakukan LOGGING, kita perlu menambahkan rules iptables Log pada sebelum rules yang sudah dibuat pada no.9
+```sh
+iptables -I INPUT -m recent --name portscan --update --seconds 600 --hitcount 20 -j LOG --log-prefix "Portscan detected: " --log-level 4
+
+iptables -I FORWARD -m recent --name portscan --update --seconds 600 --hitcount 20 -j LOG --log-prefix "Portscan detected: " --log-level 4
+```
+**Penjelasan**
+
+```sh
+iptables -I INPUT -m recent --name portscan --update --seconds 600 --hitcount 20 -j
+``` 
+dan 
+```sh
+iptables -I FORWARD -m recent --name portscan --update --seconds 600 --hitcount 20 -j
+```
+memiliki konsep rules yang sama seperti pada no 9, perbedaannya kita perlu menambahkan parameter rules `` LOG --log-prefix "Portscan detected: " --log-level 4`` dengan tujuan untuk mengarahkan paket yang memenuhi aturan untuk dilakukan logging.
+- ``-j LOG``: digunakan untuk melakukan logging.
+- ``--log-prefix "Portscan detected: "``: digunakan untuk menambahkan prefix kedalam log yaitu teks "Portscan detected: {isi log}".
+- ``--log-level 4``: menentukan tingakatan atau level log pada syslog, dalam hal ini level 4 berarti 'Warning'.
+
+Karena pada log sebelumnya kita menentukan level log 4 (warning), selanjutnya kita perlu melakukan konfigurasi pada ``etc/rsyslog.d/50-default.conf`` untuk menambahkan configurasi 
+``kernel.warning                  -/var/log/iptables.log``
+sehingga seperti configurasi dibawah ini
+```sh
+
+#
+# First some standard log files.  Log by facility.
+#
+auth,authpriv.*                 /var/log/auth.log
+*.*;auth,authpriv.none          -/var/log/syslog
+#cron.*                         /var/log/cron.log
+#daemon.*                       -/var/log/daemon.log
+kern.*                          -/var/log/kern.log
+kernel.warning                  -/var/log/iptables.log
+#lpr.*                          -/var/log/lpr.log
+mail.*                          -/var/log/mail.log
+#user.*                         -/var/log/user.log
+
+#
+# Logging for the mail system.  Split it up so that
+# it is easy to write scripts to parse these files.
+#
+#mail.info                      -/var/log/mail.info
+#mail.warn                      -/var/log/mail.warn
+mail.err                        /var/log/mail.err
+```
+jika sudah kita perlu melakukan menjalankan command ``touch /var/log/iptables.log`` dan menjalankan ``/etc/init.d/rsyslog restart`` untuk melakukan restart syslog supaya konfigurasi baru dapat diterapkan kedalam syslog dan hasil log bisa masuk kedalam iptables.log
