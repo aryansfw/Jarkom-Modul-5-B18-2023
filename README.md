@@ -232,9 +232,106 @@ auto eth0
 iface eth0 inet dhcp
 ```
 
-Kemudian, dilakukan kongfigurasi untuk set-up DHCP di beberapa node seperti berikut:
+Kemudian, client memperoleh IP dari DHCP server yaitu node Revolte. DHCP server perlu install isc-dhcp-server menggunakan
 
+```bash
+apt-get update
+apt-get install isc-dhcp-server -y
+```
 
+Lalu pada file `/etc/default/isc-dhcp-server` seperti berikut.
+
+```bash
+INTERFACESv4="eth0"
+INTERFACESv6=""
+```
+
+serta file `/etc/dhcp/dhcpd.conf` seperti berikut.
+
+```bash
+subnet 192.187.0.0 netmask 255.255.255.252 {
+}
+
+subnet 192.187.8.0 netmask 255.255.248.0 {
+        range 192.187.8.2 192.187.15.254;
+        option routers 192.187.8.1;
+        option broadcast-address 192.187.15.255;
+}
+
+subnet 192.187.4.0 netmask 255.255.252.0 {
+        range 192.187.4.2 192.187.7.254;
+        option routers 192.187.4.1;
+        option broadcast-address 192.187.7.255;
+}
+
+subnet 192.187.0.4 netmask 255.255.255.252 {
+}
+
+subnet 192.187.0.16 netmask 255.255.255.252 {
+}
+
+subnet 192.187.0.20 netmask 255.255.255.252 {
+}
+
+subnet 192.187.2.0 netmask 255.255.254.0 {
+        range 192.187.2.2 192.187.3.254;
+        option routers 192.187.2.1;
+        option broadcast-address 192.187.3.255;
+}
+
+subnet 192.187.0.128 netmask 255.255.255.128 {
+        range 192.187.0.132 192.187.0.254;
+        option routers 192.187.0.131;
+        option routers 192.187.0.129;
+        option broadcast-address 192.187.0.255;
+}
+
+subnet 192.187.0.24 netmask 255.255.255.252 {
+}
+
+subnet 192.187.0.28 netmask 255.255.255.252 {
+}
+```
+
+Kemudian kita bisa restart service `isc-dhcp-server` menggunakan
+
+```bash
+service isc-dhcp-server restart
+```
+
+Lalu pada router-router selain DHCP server dikonfigurasi menjadi DHCP relay. Router tersebut yaitu Fern, Himmel, Frieren, Aura, dan Heiter.	Contohnya pada node Fern, kita bisa install DHCP relay menggunakan
+
+```bash
+apt-get update
+apt-get install isc-dhcp-relay -y
+```
+
+Lalu edit file `/etc/default/isc-dhcp-relay` seperti berikut.
+
+```bash
+SERVERS="192.187.0.30"
+INTERFACES="eth0 eth1 eth2"
+OPTIONS=
+```
+
+- `SERVERS` diisi dengan IP DHCP server
+- `INTERFACES` diisi dengan interface ethernet yang terhubung dengan router tersebut
+
+Selain itu, kita juga edit file `/etc/sysctl.conf` seperti berikut.
+
+```conf
+net.ipv4.ip_forward=1
+```
+
+Lalu kita restart service menggunakan
+
+```bash
+service isc-dhcp-relay restart
+```
+
+Konfigurasi dilakukan untuk setiap DHCP relay. Contoh hasil DHCP adalah sebagai berikut. Bisa dilihat node SchwerMountains memperoleh IP lease 192.187.0.132. Ini berarti DHCP sudah jalan.
+
+![schwer mountain ip](https://github.com/aryansfw/Jarkom-Modul-5-B18-2023/assets/115603634/73cac070-ffaf-435a-a876-466658c05604)
 
 ## **Soal Nomor 1**
 Agar topologi yang kalian buat dapat mengakses keluar, kalian diminta untuk mengkonfigurasi Aura menggunakan iptables, tetapi tidak ingin menggunakan MASQUERADE.
